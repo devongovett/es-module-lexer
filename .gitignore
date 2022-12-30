@@ -8,3 +8,8 @@ src/lexer.js
 types/lexer.d.ts
 src/*.mem
 src/lexer.js.map
+
+# Added by cargo
+
+/target
+/Cargo.lock
