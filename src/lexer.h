@@ -13,6 +13,7 @@ typedef unsigned char char16_t;
 
 const char16_t* STANDARD_IMPORT = (char16_t*)0x1;
 const char16_t* IMPORT_META = (char16_t*)0x2;
+const char16_t* REQUIRE = (char16_t*)0x3;
 const char16_t __empty_char = '\0';
 const char16_t* EMPTY_CHAR = &__empty_char;
 
@@ -266,6 +267,7 @@ bool parse ();
 
 void tryParseImportStatement (State *state);
 void tryParseExportStatement (State *state);
+void tryParseRequire (State *state);
 
 void readImportString (State *state, const char16_t* ss, char16_t ch);
 char16_t readExportAs (State *state, char16_t* startPos, char16_t* endPos);
@@ -299,9 +301,9 @@ bool isParenKeyword (State *state, char16_t* pos);
 bool isPunctuator (char16_t charCode);
 bool isExpressionPunctuator (char16_t charCode);
 bool isExpressionTerminator (State *state, char16_t* pos);
+bool isIdentifierChar(uint32_t code);
+uint32_t nextChar(State *state);
+static void *utf8_decode(void *buf, uint32_t *c, int *e);
 
-void nextChar (char16_t ch);
-void nextCharSurrogate (char16_t ch);
-char16_t readChar ();
 
 void syntaxError (State *state);

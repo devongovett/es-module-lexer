@@ -1,7 +1,8 @@
 fn main() {
     println!("cargo:rerun-if-changed=src/lexer.h");
     cc::Build::new()
-        .file("src/lexer.c")
-        .define("RUST_BUILD", None)
-        .compile("lexer.a");
+    .warnings(false)
+    .define("RUST_BUILD", None)
+    .file("src/lexer.c")
+    .compile("lexer.a");
 }
