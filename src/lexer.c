@@ -275,13 +275,13 @@ void tryParseImportStatement (State *state) {
       ch = commentWhitespace(state, true);
       addImport(state, startPos, state->pos, 0, dynamicPos);
       state->dynamicImportStack[state->dynamicImportStackDepth++] = state->import_write_head;
-      if (ch == '\'') {
+      if (ch == '\'' || ch == '"') {
         stringLiteral(state, ch);
-      }
-      else if (ch == '"') {
-        stringLiteral(state, ch);
-      }
-      else {
+      } else if (ch == '`') {
+        state->openTokenStack[state->openTokenDepth].pos = state->pos;
+        state->openTokenStack[state->openTokenDepth++].token = Template;
+        templateString(state);
+      } else {
         state->pos--;
         return;
       }
@@ -398,6 +398,10 @@ void tryParseRequire (State *state) {
       state->dynamicImportStack[state->dynamicImportStackDepth++] = state->import_write_head;
       if (ch == '\'' || ch == '"') {
         stringLiteral(state, ch);
+      } else if (ch == '`') {
+        state->openTokenStack[state->openTokenDepth].pos = state->pos;
+        state->openTokenStack[state->openTokenDepth++].token = Template;
+        templateString(state);
       } else {
         state->pos--;
         return;

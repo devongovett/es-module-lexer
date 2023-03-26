@@ -1,6 +1,6 @@
 use bumpalo::Bump;
 use core::alloc::Layout;
-use std::{ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr, sync::atomic::AtomicPtr, borrow::Cow};
+use std::{borrow::Cow, ffi::c_void, marker::PhantomData, mem::MaybeUninit, ptr, sync::atomic::AtomicPtr};
 
 type Allocate = unsafe extern "C" fn(bytes: u32, user_data: *mut c_void) -> *mut c_void;
 extern "C" {
@@ -17,7 +17,7 @@ pub struct Import<'a> {
   dynamic: *const u8,
   safe: bool,
   next: *const Import<'a>,
-  phantom: PhantomData<&'a ()>
+  phantom: PhantomData<&'a ()>,
 }
 
 unsafe impl<'a> Send for Import<'a> {}
@@ -38,7 +38,8 @@ impl<'a> Import<'a> {
       (self.start, self.end)
     };
 
-    let s = unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(start, end as usize - start as usize)) };
+    let s =
+      unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(start, end as usize - start as usize)) };
     if matches!(self.kind(), ImportKind::Standard | ImportKind::DynamicString) {
       unescape(s).unwrap_or(Cow::Borrowed(s))
     } else {
@@ -95,7 +96,7 @@ fn unescape<'a>(s: &'a str) -> Result<Cow<'a, str>, ()> {
         b'x' => {
           i += 1;
           read_hex(bytes, &mut i, 2)?
-        },
+        }
         b'u' if i + 1 < bytes.len() => {
           i += 1;
           if bytes[i] == b'{' {
@@ -105,7 +106,7 @@ fn unescape<'a>(s: &'a str) -> Result<Cow<'a, str>, ()> {
               i += 1;
               res
             } else {
-              return Err(())
+              return Err(());
             }
           } else {
             read_hex(bytes, &mut i, 4)?
@@ -123,15 +124,15 @@ fn unescape<'a>(s: &'a str) -> Result<Cow<'a, str>, ()> {
                 break;
               }
             } else {
-              break
+              break;
             }
           }
           if i < bytes.len() && (bytes[i] == b'8' || bytes[i] == b'9') {
-            return Err(())
+            return Err(());
           }
           total as char
         }
-        c => c as char
+        c => c as char,
       };
 
       let mut buf = [0; 4];
@@ -330,36 +331,54 @@ mod tests {
   use super::*;
 
   #[test]
-  fn it_works() {
+  fn esm() {
     let res = lex(
-      r#"import foo from "bar";
+      r#"
         import bar from "foo";
         export * as foo from "yoooo";
         export {test as hi};
-        
-        console.log(import("./hi"), import(hi), import.meta.dofih)"#,
+
+        import("./bar");
+        import('./baz');
+        import(`./a`);
+        import(hi);
+        import('./test/' + foo);
+        import(`./test/${foo}`);
+      "#,
     )
     .unwrap();
-    for import in res.imports() {
-      println!("IMPORT {} {:?}", import.specifier(), import.kind());
-    }
 
-    for export in res.exports() {
-      println!("EXPORT {:?} {:?}", export.exported(), export.local())
-    }
+    let imports: Vec<(Cow<'_, str>, ImportKind)> = res.imports().map(|i| (i.specifier(), i.kind())).collect();
+    let imports: Vec<(&str, ImportKind)> = imports.iter().map(|(i, k)| (i.as_ref(), *k)).collect();
+    assert_eq!(
+      imports,
+      vec![
+        ("foo", ImportKind::Standard),
+        ("yoooo", ImportKind::Standard),
+        ("./bar", ImportKind::DynamicString),
+        ("./baz", ImportKind::DynamicString),
+        ("./a", ImportKind::DynamicString),
+        ("hi", ImportKind::DynamicExpression),
+        ("'./test/' + foo", ImportKind::DynamicExpression),
+        ("`./test/${foo}`", ImportKind::DynamicExpression),
+      ]
+    );
   }
 
   #[test]
   fn requires() {
-    let res = lex(r#"
+    let res = lex(
+      r#"
       require("./foo");
       require('./bar');
+      require(`./baz`);
       require(/* something*/ 'yo');
       require(
         'test'
       );
       require(hi);
       require('foo/' + bar);
+      require(`foo/${bar}`);
       require('foo', bar);
       foo(require);
       foo.require(); // ignored
@@ -388,29 +407,36 @@ mod tests {
       require('./\251.js');
       require('./foo\
 .js');
-    "#).unwrap();
+    "#,
+    )
+    .unwrap();
 
     let imports: Vec<(Cow<'_, str>, ImportKind)> = res.imports().map(|i| (i.specifier(), i.kind())).collect();
     let imports: Vec<(&str, ImportKind)> = imports.iter().map(|(i, k)| (i.as_ref(), *k)).collect();
-    assert_eq!(imports, vec![
-      ("./foo", ImportKind::DynamicString),
-      ("./bar", ImportKind::DynamicString),
-      ("yo", ImportKind::DynamicString),
-      ("test", ImportKind::DynamicString),
-      ("hi", ImportKind::DynamicExpression),
-      ("'foo/' + bar", ImportKind::DynamicExpression),
-      ("'foo', bar", ImportKind::DynamicExpression),
-      ("", ImportKind::DynamicExpression),
-      ("", ImportKind::DynamicExpression),
-      ("", ImportKind::DynamicExpression),
-      ("", ImportKind::DynamicExpression),
-      ("bar", ImportKind::DynamicString),
-      ("", ImportKind::DynamicExpression),
-      ("crypto", ImportKind::DynamicString),
-      ("./𠈄.js", ImportKind::DynamicString),
-      ("./abc.js", ImportKind::DynamicString),
-      ("./©.js", ImportKind::DynamicString),
-      ("./foo.js", ImportKind::DynamicString),
-    ]);
+    assert_eq!(
+      imports,
+      vec![
+        ("./foo", ImportKind::DynamicString),
+        ("./bar", ImportKind::DynamicString),
+        ("./baz", ImportKind::DynamicString),
+        ("yo", ImportKind::DynamicString),
+        ("test", ImportKind::DynamicString),
+        ("hi", ImportKind::DynamicExpression),
+        ("'foo/' + bar", ImportKind::DynamicExpression),
+        ("`foo/${bar}`", ImportKind::DynamicExpression),
+        ("'foo', bar", ImportKind::DynamicExpression),
+        ("", ImportKind::DynamicExpression),
+        ("", ImportKind::DynamicExpression),
+        ("", ImportKind::DynamicExpression),
+        ("", ImportKind::DynamicExpression),
+        ("bar", ImportKind::DynamicString),
+        ("", ImportKind::DynamicExpression),
+        ("crypto", ImportKind::DynamicString),
+        ("./𠈄.js", ImportKind::DynamicString),
+        ("./abc.js", ImportKind::DynamicString),
+        ("./©.js", ImportKind::DynamicString),
+        ("./foo.js", ImportKind::DynamicString),
+      ]
+    );
   }
 }
