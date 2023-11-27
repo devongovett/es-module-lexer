@@ -383,7 +383,7 @@ void tryParseImportStatement (State *state) {
 }
 
 void tryParseRequire (State *state) {
-  uint16_t* startPos = state->pos;
+  char16_t* startPos = state->pos;
   // require('...')
   if (keywordStart(state) && memcmp(state->pos + 1, &EQUIRE[0], 6 * sizeof(char16_t)) == 0) {
     state->pos += 7;

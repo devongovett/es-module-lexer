@@ -3,6 +3,7 @@ fn main() {
     cc::Build::new()
     .warnings(false)
     .define("RUST_BUILD", None)
+    .flag_if_supported("-std=c99")
     .file("src/lexer.c")
     .compile("lexer.a");
 }
